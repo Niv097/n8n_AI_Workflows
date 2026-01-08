@@ -1,0 +1,917 @@
+{
+  "name": "Authenticated AI Agent Chat with Multi-Tool Integration and Session Management",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/register",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f2d42456-1b83-456c-aec1-a1c4dd99815b",
+      "name": "Register User",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        96
+      ],
+      "webhookId": "5081bc1c-1d72-476c-a370-7d0ed16811ad"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/login",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "5a034277-b8c7-48e6-8732-ae599a42da88",
+      "name": "Login User",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        416
+      ],
+      "webhookId": "599e820a-5a87-49d8-b7c6-dc4ad87144b0"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/refresh",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "2b782964-31e4-487d-a9f0-5aa52795c2b1",
+      "name": "Refresh Token",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        1456
+      ],
+      "webhookId": "755836fd-18c9-4fa9-a3b0-345179cfbfe0"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "1a07e42e-265c-4ede-83a3-f6eb437e1452",
+      "name": "Chat Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        992
+      ],
+      "webhookId": "ee0ecd41-076a-47c8-8256-fef828d941b2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const bcrypt = require('bcrypt');\nconst { email, password } = $input.json.body;\nconst hashedPassword = await bcrypt.hash(password, 10);\nreturn { email, hashedPassword };"
+      },
+      "id": "c18f7274-d6f7-4877-8efd-4311c061cdf8",
+      "name": "Hash Password",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst jwt = require('jsonwebtoken');\n\nconst userId = $input.item.json.id;\nconst sessionId = crypto.randomUUID();\n\nconst accessToken = jwt.sign(\n  { userId, sessionId },\n  '146937c416ed8f4221a898fb4354ddfb988a82a882e24d161be15a5ece4aa909',\n  { expiresIn: '1h' }\n);\n\nconst refreshToken = jwt.sign(\n  { userId, sessionId },\n  'f087319d2149da55297530f15dbcfcebe1d2ca62dac22ac2fffa05fd964c911e',\n  { expiresIn: '7d' }\n);\n\nreturn { userId, sessionId, accessToken, refreshToken };"
+      },
+      "id": "1e20cf95-b488-492c-ba21-651db8aa4371",
+      "name": "Generate Tokens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"accessToken\": \"={{ $('Generate Tokens').item.json.accessToken }}\",\n  \"refreshToken\": \"={{ $('Generate Tokens').item.json.refreshToken }}\",\n  \"sessionId\": \"={{ $('Generate Tokens').item.json.sessionId }}\"\n}",
+        "options": {}
+      },
+      "id": "83488731-58ed-4e35-a4f0-960636747c4b",
+      "name": "Return Registration Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2096,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const bcrypt = require('bcrypt');\nconst password = $('Login User').item.json.body.password;\nconst hashedPassword = $input.item.json.password_hash;\nconst isValid = await bcrypt.compare(password, hashedPassword);\nreturn { ...($input.item.json), isValid };"
+      },
+      "id": "1ef309fb-0bbd-493b-bb1a-18e786f275d2",
+      "name": "Verify Password",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "38575398-9e0e-4296-a828-aa55490f9f1c",
+      "name": "Password Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1648,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst jwt = require('jsonwebtoken');\n\nconst userId = $input.item.json.id;\nconst sessionId = crypto.randomUUID();\n\nconst accessToken = jwt.sign(\n  { userId, sessionId },\n  '<__PLACEHOLDER_VALUE__JWT_SECRET__>',\n  { expiresIn: '1h' }\n);\n\nconst refreshToken = jwt.sign(\n  { userId, sessionId },\n  '<__PLACEHOLDER_VALUE__JWT_REFRESH_SECRET__>',\n  { expiresIn: '7d' }\n);\n\nreturn {\n  userId,\n  sessionId,\n  accessToken,\n  refreshToken\n};"
+      },
+      "id": "2945c573-bc2e-46d1-a6da-19c5f02cdcd7",
+      "name": "Generate Login Tokens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"accessToken\": \"={{ $('Generate Login Tokens').item.json.accessToken }}\",\n  \"refreshToken\": \"={{ $('Generate Login Tokens').item.json.refreshToken }}\",\n  \"sessionId\": \"={{ $('Generate Login Tokens').item.json.sessionId }}\"\n}",
+        "options": {}
+      },
+      "id": "10b2e788-7099-4c65-b716-fd9277c1eb10",
+      "name": "Return Login Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2320,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"Invalid credentials\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "2a6d193e-f75e-4715-9702-863d0abc472b",
+      "name": "Return Login Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1872,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2146c3e1-77b2-4e3f-a438-01e34d970971",
+      "name": "Token Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1424,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jwt = require('jsonwebtoken');\nconst userId = $input.item.json.user_id;\nconst sessionId = $input.item.json.session_id;\nconst accessToken = jwt.sign({ userId, sessionId }, '<__PLACEHOLDER_VALUE__JWT_SECRET__>', { expiresIn: '1h' });\nreturn { userId, sessionId, accessToken };"
+      },
+      "id": "55827c95-f1f8-466f-a801-44cfcbc70765",
+      "name": "Generate New Access Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"accessToken\": \"={{ $json.accessToken }}\"\n}",
+        "options": {}
+      },
+      "id": "4a3d0615-3a67-42aa-9ea9-a9489ed8e86a",
+      "name": "Return New Token",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2096,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"Invalid or expired refresh token\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "d4b5bb8e-3e37-4d26-944a-2e884b97cbc7",
+      "name": "Return Token Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1648,
+        1552
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const jwt = require('jsonwebtoken');\nconst authHeader = $input.item.json.headers.authorization;\n\nif (!authHeader || !authHeader.startsWith('Bearer ')) {\n  return { isValid: false };\n}\n\nconst token = authHeader.substring(7);\n\ntry {\n  const decoded = jwt.verify(token, '<__PLACEHOLDER_VALUE__JWT_SECRET__>');\n  return {\n    isValid: true,\n    userId: decoded.userId,\n    sessionId: decoded.sessionId,\n    message: $input.item.json.body.message\n  };\n} catch (error) {\n  return { isValid: false };\n}"
+      },
+      "id": "886d38e4-5ded-4ccb-a350-453258df8fd8",
+      "name": "Validate Access Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9b40e0c4-d0fa-4f76-beac-64aa4530683d",
+      "name": "Access Token Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1424,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "You are a helpful AI assistant with access to multiple tools. Your personality is friendly, knowledgeable, and efficient.\n\nYou have access to the following capabilities:\n- Get random jokes to entertain users\n- Search Wikipedia for information on any topic\n- Calculate future dates based on days from today\n- Generate secure random passwords with specified length\n- Calculate monthly loan payments given principal, interest rate, and term\n- Fetch the latest articles from the n8n blog\n\nWhen a user asks for something, analyze their request and use the appropriate tool. Always provide clear, helpful responses and explain what you're doing."
+        }
+      },
+      "id": "e6340a16-5765-4c99-b53a-d54bc65491e0",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2032,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"response\": \"={{ $json.output }}\"\n}",
+        "options": {}
+      },
+      "id": "e21dcc49-e2d6-4838-a4a8-5f44ac35e9d2",
+      "name": "Return Chat Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2752,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"Unauthorized - Invalid or missing access token\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "13d1a51f-e368-4a7e-a852-94fb51f4fb58",
+      "name": "Return Auth Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2096,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "da15490b-f4fd-4c62-baea-a89976775655",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1648,
+        960
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "XJHP60dRfQ5WmpNV",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "a1e049f6-8098-47e9-affd-a157370f013f",
+      "name": "Wikipedia Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns a random joke to entertain the user",
+        "jsCode": "const jokes = ['Why do programmers prefer dark mode? Because light attracts bugs!', 'Why did the developer go broke? Because he used up all his cache!', 'How many programmers does it take to change a light bulb? None, that\\'s a hardware problem!', 'Why do Java developers wear glasses? Because they don\\'t C#!', 'What\\'s a programmer\\'s favorite hangout place? Foo Bar!']; return jokes[Math.floor(Math.random() * jokes.length)];"
+      },
+      "id": "f34f1406-8320-4e94-bc59-88c98f9a903e",
+      "name": "Joke Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1904,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Calculates a future date by adding a specified number of days to today. Input: { \"days\": number }. Returns the future date in ISO format.",
+        "jsCode": "const days = $input.days || 0; const futureDate = new Date(); futureDate.setDate(futureDate.getDate() + days); return { futureDate: futureDate.toISOString().split('T')[0], daysAdded: days };"
+      },
+      "id": "7494df6d-4dd4-4293-b682-ab7477ba0eb1",
+      "name": "Date Calculator Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        2032,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Generates a secure random password. Input: { \"length\": number }. Default length is 16 characters. Returns a random password.",
+        "jsCode": "const length = $input.length || 16; const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?'; let password = ''; for (let i = 0; i < length; i++) { password += charset.charAt(Math.floor(Math.random() * charset.length)); } return { password, length };"
+      },
+      "id": "54f1f9bb-a2d4-4852-824b-67708154e7cc",
+      "name": "Password Generator Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        2160,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Calculates monthly loan payment. Input: { \"principal\": number (loan amount), \"annualRate\": number (annual interest rate as percentage, e.g., 5 for 5%), \"years\": number (loan term in years) }. Returns monthly payment amount.",
+        "jsCode": "const principal = $input.principal || 0; const annualRate = $input.annualRate || 0; const years = $input.years || 0; const monthlyRate = (annualRate / 100) / 12; const numPayments = years * 12; const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1); return { monthlyPayment: monthlyPayment.toFixed(2), principal, annualRate, years, totalPayments: (monthlyPayment * numPayments).toFixed(2) };"
+      },
+      "id": "53ee6c2f-c1f6-45d1-ab6d-6bb415673245",
+      "name": "Loan Calculator Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        2288,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetches the latest articles from the n8n blog. Returns a list of recent blog posts with titles and links.",
+        "url": "https://n8n.io/blog/feed/",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "416bd50a-b17c-4d7d-a030-f3977113efa0",
+      "name": "n8n Blog Tool",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        2416,
+        960
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "afefe8d2-a1b0-42d6-840c-301857db754d",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        2544,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!global.users) global.users = {}; const userId = Date.now(); global.users[userId] = { id: userId, email: $input.item.json.email, password_hash: $input.item.json.hashedPassword, created_at: new Date().toISOString() }; return { id: userId, email: $input.item.json.email, password_hash: $input.item.json.hashedPassword };"
+      },
+      "id": "88813c2a-efea-4258-afb8-465b9c254588",
+      "name": "Store User in Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!global.sessions) global.sessions = {}; global.sessions[$input.item.json.sessionId] = { user_id: $input.item.json.userId, session_id: $input.item.json.sessionId, refresh_token: $input.item.json.refreshToken, expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), created_at: new Date().toISOString() }; return $input.item.json;"
+      },
+      "id": "c419969f-33d6-4988-b1b7-d6a2f40dfb18",
+      "name": "Store Session in Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!global.users) global.users = {}; const email = $input.item.json.body.email; const user = Object.values(global.users).find(u => u.email === email); if (!user) throw new Error('User not found'); return user;"
+      },
+      "id": "9acfc134-656a-4597-80fb-634508f522f3",
+      "name": "Find User in Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!global.sessions) global.sessions = {}; global.sessions[$input.item.json.sessionId] = { user_id: $input.item.json.userId, session_id: $input.item.json.sessionId, refresh_token: $input.item.json.refreshToken, expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), created_at: new Date().toISOString() }; return $input.item.json;"
+      },
+      "id": "5a97948b-d35f-44e0-859f-41d074bf4dde",
+      "name": "Store Login Session in Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2096,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!global.sessions) global.sessions = {}; const refreshToken = $input.item.json.body.refreshToken; const session = Object.values(global.sessions).find(s => s.refresh_token === refreshToken && new Date(s.expires_at) > new Date()); if (!session) return { id: null }; return session;"
+      },
+      "id": "8b42b184-7d7e-4d3d-8462-38627bfe17a2",
+      "name": "Find Session in Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!global.sessions) global.sessions = {}; if (global.sessions[$input.item.json.sessionId]) { global.sessions[$input.item.json.sessionId].last_accessed = new Date().toISOString(); } return $input.item.json;"
+      },
+      "id": "b202896b-5c93-448a-9006-aa75b02112eb",
+      "name": "Update Session in Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        1360
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Register User": {
+      "main": [
+        [
+          {
+            "node": "Hash Password",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash Password": {
+      "main": [
+        [
+          {
+            "node": "Store User in Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Tokens": {
+      "main": [
+        [
+          {
+            "node": "Store Session in Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login User": {
+      "main": [
+        [
+          {
+            "node": "Find User in Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Password": {
+      "main": [
+        [
+          {
+            "node": "Password Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Password Valid?": {
+      "main": [
+        [
+          {
+            "node": "Generate Login Tokens",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Login Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Login Tokens": {
+      "main": [
+        [
+          {
+            "node": "Store Login Session in Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token": {
+      "main": [
+        [
+          {
+            "node": "Find Session in Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Valid?": {
+      "main": [
+        [
+          {
+            "node": "Generate New Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Token Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate New Access Token": {
+      "main": [
+        [
+          {
+            "node": "Update Session in Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Message": {
+      "main": [
+        [
+          {
+            "node": "Validate Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Access Token": {
+      "main": [
+        [
+          {
+            "node": "Access Token Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Access Token Valid?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Return Chat Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Joke Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date Calculator Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Password Generator Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loan Calculator Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n Blog Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store User in Memory": {
+      "main": [
+        [
+          {
+            "node": "Generate Tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Session in Memory": {
+      "main": [
+        [
+          {
+            "node": "Return Registration Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find User in Memory": {
+      "main": [
+        [
+          {
+            "node": "Verify Password",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Login Session in Memory": {
+      "main": [
+        [
+          {
+            "node": "Return Login Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Session in Memory": {
+      "main": [
+        [
+          {
+            "node": "Token Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Session in Memory": {
+      "main": [
+        [
+          {
+            "node": "Return New Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "babaea95-25f7-4947-8a1e-35b8e92f3ed8",
+  "meta": {
+    "instanceId": "e0ee7317c0ae441f13cffe8c918f6b20a91a7f9239707b6f5b821dd9ec92cb30"
+  },
+  "id": "QWvrc17YGEFy0u5Q",
+  "tags": []
+}
